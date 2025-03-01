@@ -19,8 +19,13 @@ def get_crypto_prices(crypto_ids):
         print("⚠️ Error fetching prices:", e)
         return {}
 
-# Example Usage
-crypto_ids = ["bitcoin", "ethereum", "dogecoin"]  # Example cryptos
+# List of 15 cryptocurrencies
+crypto_ids = [
+    "bitcoin", "ethereum", "dogecoin", "ripple", "cardano", "solana", "polkadot", 
+    "litecoin", "chainlink", "stellar", "monero", "tron", "avalanche-2", "uniswap", "algorand"
+]
+
+# Fetch and display prices
 prices = get_crypto_prices(crypto_ids)
 
 print("\n📊 Current Prices:")

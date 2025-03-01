@@ -17,14 +17,14 @@ def get_crypto_ids():
         return crypto_dict
     
     except requests.exceptions.RequestException as e:
-        print("⚠️ Error fetching crypto list from CoinGecko:", e)
+        print(" Error fetching crypto list from CoinGecko:", e)
         return {}  # Return an empty dictionary if an error occurs
 
 # Example Usage
 crypto_dict = get_crypto_ids()
 
 if crypto_dict:
-    print("\n✅ Total Cryptocurrencies Available:", len(crypto_dict))
-    print("\n🔹 First 10 Cryptos Available:", list(crypto_dict.items())[:10])  # Show first 10 cryptos
+    print("\n Total Cryptocurrencies Available:", len(crypto_dict))
+    print("\n First 10 Cryptos Available:", list(crypto_dict.items())[:10])  # Show first 10 cryptos
 else:
-    print("\n⚠️ No data retrieved. Please check your API connection.")
+    print("\n No data retrieved. Please check your API connection.")
