@@ -18,16 +18,43 @@ async function getApi() {
     return res.text(); // could also return res.json() here if we want it in the json format
   }
 
+// posts data to API and returns response
+  async function postApi(data) {
+    const res = await fetch(`https://httpbin.org/post`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: data,
+    });
+  
+    if (!res.ok) {
+      throw new Error("Failed to update menu");
+    }
+    return res.text();
+  }
+
   // calls getAPI
   const fetchData = async () => {
     try {
       const data = await getApi();
-      document.getElementById('output').textContent = data;
+      //const data = await postApi(document.getElementById('query').value);
+      messageDisplay(data, document.getElementById('answer'), 15);
       return data;
     } catch (error) {
       setError(error.message);
     }
   };
+
+  function messageDisplay(str, element, timeBetween) {
+    var index = -1;
+    (function go() {
+      if (++index < str.length) {
+        element.innerHTML = element.innerHTML + str.charAt(index);
+        setTimeout(go, timeBetween);
+      }
+    })();
+    }
 
 const Page = () => {
     const router = useRouter();
@@ -39,6 +66,11 @@ const Page = () => {
     const onFinish = (event) => {
       event.preventDefault();
       setIsLoading(true);
+
+      document.getElementById("question").style.display = "block";
+      document.getElementById("answer").style.display = "block";
+      document.getElementById('question').textContent = document.getElementById('query').value;
+      document.getElementById('query').value = "";
       fetchData()
         .then(result => {
           // can perform operations with the result of fetchData here
@@ -56,12 +88,13 @@ const Page = () => {
     }, []);
 
     return (
-      <form onSubmit={onFinish} >
+      <form id="form" onSubmit={onFinish} >
         <div className={styles.main}>
         <div className={styles.ctas}>
-          <label htmlFor="query">Enter your query here</label>
+          <label htmlFor="query">Enter your query here:</label>
           <input
             required
+            id="query"
             name="query"
             value={formData.query}
             onChange={(event) =>
@@ -76,7 +109,8 @@ const Page = () => {
           </button>
         </div>
         </div>
-        <div id="output"></div>
+        <div className={styles.question} id="question" style={{display: "none"}}></div>
+        <div className={styles.answer} id="answer" style={{display: "none"}}></div>
       </form>
     );
   };
