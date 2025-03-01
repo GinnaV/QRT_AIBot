@@ -43,7 +43,7 @@ def get_crypto_prices():
         return response.json()
     
     except requests.exceptions.RequestException as e:
-        print("⚠️ Error fetching prices:", e)
+        print(" Error fetching prices:", e)
         return {}
 
 # Fetch prices initially (can be refreshed periodically)
@@ -99,5 +99,5 @@ user_queries = [
 ]
 
 for query in user_queries:
-    print(f"\n🧑‍💻 User: {query}")
-    print(f"🤖 AI: {ask_crypto_ai(query)}")
+    print(f"\n User: {query}")
+    print(f" AI: {ask_crypto_ai(query)}")
