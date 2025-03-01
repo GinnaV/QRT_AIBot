@@ -1,8 +1,9 @@
 import openai
+from dotenv import load_dotenv
 import os
 
-
-openai_client = openai.OpenAI(api_key=)
+load_dotenv()
+openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  
 response = openai_client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[{"role": "user", "content": "Hello, AI!"}]
