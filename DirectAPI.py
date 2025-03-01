@@ -16,7 +16,7 @@ def get_crypto_prices(crypto_ids):
         return prices
     
     except requests.exceptions.RequestException as e:
-        print("⚠️ Error fetching prices:", e)
+        print(" Error fetching prices:", e)
         return {}
 
 # List of 15 cryptocurrencies
@@ -28,6 +28,6 @@ crypto_ids = [
 # Fetch and display prices
 prices = get_crypto_prices(crypto_ids)
 
-print("\n📊 Current Prices:")
+print("\n Current Prices:")
 for crypto, data in prices.items():
     print(f"{crypto.capitalize()}: ${data['usd']}")
