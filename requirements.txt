@@ -1,0 +1,26 @@
+# Core Libraries
+requests
+python-dotenv
+openai
+argparse
+
+# Machine Learning & Deep Learning
+torch
+torchvision
+torchaudio
+
+# Data Processing
+pandas
+numpy
+scikit-learn
+
+# NLP & Text Processing
+regex
+
+# Environment Setup
+tqdm
+matplotlib
+seaborn
+
+# For Handling JSON & System Operations
+json5
