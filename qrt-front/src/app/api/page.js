@@ -18,10 +18,15 @@ var xhr = null;
         return xhr;
     };
 
+var messageId = 0;
+
   function sendDataCallback() {
     // Check response is ready or not
     if (xhr.readyState == 4 && xhr.status == 201) {
-        messageDisplay(JSON.parse(xhr.responseText).message, document.getElementById('answer'), 10);
+      const newDiv = document.createElement('div');
+      newDiv.innerHTML += `<div class="answer" id="answer${messageId}" ></div>`;
+      document.getElementById("mainDiv").appendChild(newDiv);
+        messageDisplay(JSON.parse(xhr.responseText).message, document.getElementById('answer'+messageId), 10);
     }
 }
 
@@ -49,26 +54,33 @@ var xhr = null;
     })();
     }
 
+function submit() {
+  //document.getElementById("question").style.display = "block";
+  var question = document.getElementById('query').value;
+      //document.getElementById("answer").style.display = "block";
+      document.getElementById("answer").innerHTML = "";
+      messageId += 1;
+      const newDiv = document.createElement('div');
+      newDiv.innerHTML += `<div class="question" id="question${messageId}" >${question}</div>`;
+      document.getElementById("mainDiv").appendChild(newDiv);
+      //document.getElementById('question').textContent = question;
+      sendData(question);
+}
+
 const Page = () => {
-    const router = useRouter();
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
   
     // form submission
     const onFinish = (event) => {
-
       document.getElementById("question").style.display = "block";
       document.getElementById("answer").style.display = "block";
       document.getElementById("answer").innerHTML = "";
       var question = document.getElementById('query').value;
       document.getElementById('question').textContent = question;
+      messageId += 1;
+      document.getElementById("mainDiv")
+      .innerHTML += `<div className=${styles.question} id="question${messageId}" >${question}</div>`;
       sendData(question);
     };
-  
-    // cleanup effect for resetting loading state
-    useEffect(() => {
-      return () => setIsLoading(false);
-    }, []);
 
     return (
         <div id="mainDiv" className={styles.main}>
@@ -80,10 +92,7 @@ const Page = () => {
             id="query"
             name="query"
           />
-        </div>
-        {error && <p className="error-message">{error}</p>}
-        <div>
-          <button disabled={isLoading} className={styles.primary} type="submit" onClick={onFinish}>
+          <button className={styles.primary} id="submit" onClick={submit}>
             Submit
           </button>
         </div>
