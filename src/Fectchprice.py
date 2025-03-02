@@ -64,7 +64,7 @@ if crypto_dict:
     # Fetch and display historical prices
     for crypto in top_10_crypto_ids:
         print(f"\nLast 7 Days Prices for {crypto.capitalize()}:")
-        history = get_crypto_history(crypto, days=7)
+        history = get_crypto_history(crypto, days=3)
         
         if history:
             for date, price in history:
