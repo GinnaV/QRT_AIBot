@@ -1,4 +1,5 @@
 import argparse
+import os
 import random
 import json
 import pandas as pd
@@ -188,27 +189,64 @@ def predict_prices(model, crypto_name, lookback, num_steps):
     return preds
 
 def get_crypto_data(crypto_name):
+    """Retrieve dataset path for the given cryptocurrency."""
     CRYPTO_DATASETS = {
-        'Bitcoin': 'data/btc-usd-max.csv',
-        'Ethereum': 'data/eth-usd-max.csv',
-        'Tether': 'data/usdt-usd-max.csv'
+        'bitcoin': 'data/btc-usd-max.csv',
+        'ethereum': 'data/eth-usd-max.csv',
+        'tether': 'data/usdt-usd-max.csv'
     }  
-    return CRYPTO_DATASETS.get(crypto_name, None)
+
+    dataset_path = CRYPTO_DATASETS.get(crypto_name.lower(), None)
+
+    if dataset_path is None:
+        print(f" Error: No dataset path found for {crypto_name}. Available datasets: {list(CRYPTO_DATASETS.keys())}")
+        return None
+
+    if not os.path.exists(dataset_path):
+        print(f" Error: Dataset file not found at {dataset_path}. Ensure the CSV file exists.")
+        return None
+
+    return dataset_path
+
 
 def get_crypto_model(crypto_name):
+    """Load an existing trained model for the given cryptocurrency."""
+    crypto_name = crypto_name.lower()
+
     CRYPTO_MODELS = {
-        'Bitcoin': 'models/Bitcoin.pth',
-        'Ethereum': 'models/Ethereum.pth',
-        'Tether': 'models/Tether.pth'
+        'bitcoin': 'models/Bitcoin.pth',
+        'ethereum': 'models/Ethereum.pth',
+        'tether': 'models/Tether.pth'
     } 
+
     path = CRYPTO_MODELS.get(crypto_name, None)
-    #print(path)
-    with open(f'data/{crypto_name}.json', 'r') as json_file:
+    
+    if path is None:
+        print(f" Model path not found for {crypto_name}. Available models: {list(CRYPTO_MODELS.keys())}")
+        return None, None
+    
+    if not os.path.exists(path):
+        print(f" Error: Model file not found at {path}. Please check if the model was trained and saved correctly.")
+        return None, None
+
+    json_path = f'data/{crypto_name}.json'
+    if not os.path.exists(json_path):
+        print(f" Error: Hyperparameter file not found at {json_path}.")
+        return None, None
+
+    with open(json_path, 'r') as json_file:
         best_params = json.load(json_file)
+
     model = Model(best_params['hidden_size'], best_params['num_layers'])
-    model.load_state_dict(torch.load(path, weights_only=True))
-    model.eval()
-    return model, best_params
+    
+    try:
+        print(f" Loading model from {path}")
+        model.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
+        model.eval()
+        return model, best_params
+    except Exception as e:
+        print(f" Failed to load model: {e}")
+        return None, None
 
 
 def main():
