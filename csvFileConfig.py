@@ -23,11 +23,11 @@ def generate_crypto_csv(crypto_id="bitcoin"):
         # Save the CSV file
         df.to_csv(filename, index=False)
         
-        print(f"✅ New CSV file generated: {filename}")
+        print(f" New CSV file generated: {filename}")
         return filename
     
     except requests.exceptions.RequestException as e:
-        print(f"⚠️ Error fetching data for {crypto_id}: {e}")
+        print(f" Error fetching data for {crypto_id}: {e}")
         return None
 
 # Example Usage
