@@ -3,6 +3,7 @@ import openai
 from dotenv import load_dotenv
 import os
 import re
+import datetime
 
 # Load API Key
 load_dotenv()
@@ -14,23 +15,7 @@ crypto_ids = [
     "litecoin", "chainlink", "stellar", "monero", "tron", "avalanche-2", "uniswap", "algorand"
 ]
 
-crypto_names_map = {  # For better matching (ignoring hyphens, capitalization)
-    "bitcoin": "bitcoin",
-    "ethereum": "ethereum",
-    "dogecoin": "dogecoin",
-    "ripple": "ripple",
-    "cardano": "cardano",
-    "solana": "solana",
-    "polkadot": "polkadot",
-    "litecoin": "litecoin",
-    "chainlink": "chainlink",
-    "stellar": "stellar",
-    "monero": "monero",
-    "tron": "tron",
-    "avalanche": "avalanche-2",
-    "uniswap": "uniswap",
-    "algorand": "algorand"
-}
+crypto_names_map = {name: name for name in crypto_ids}  # Direct mapping
 
 def get_crypto_prices():
     """Fetches real-time prices for predefined crypto IDs."""
@@ -46,7 +31,27 @@ def get_crypto_prices():
         print(" Error fetching prices:", e)
         return {}
 
-# Fetch prices initially (can be refreshed periodically)
+def get_crypto_history(crypto_id, days=3):
+    """Fetches past 'days' days' historical prices for a given cryptocurrency."""
+    url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart?vs_currency=usd&days={days}&interval=daily"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Convert timestamps to readable dates with timezone awareness
+        history = {
+            datetime.datetime.fromtimestamp(item[0] / 1000, tz=datetime.timezone.utc).strftime('%Y-%m-%d'): item[1]
+            for item in data["prices"]
+        }
+        return history
+
+    except requests.exceptions.RequestException as e:
+        print(f" Error fetching historical data for {crypto_id}: {e}")
+        return {}
+
+# Fetch prices initially
 crypto_prices = get_crypto_prices()
 
 def extract_crypto_name(query):
@@ -59,23 +64,49 @@ def extract_crypto_name(query):
 
 def ask_crypto_ai(user_query):
     """
-    Processes human-like crypto queries and returns a response with real-time prices.
+    Processes human-like crypto queries and returns a response with real-time or historical prices.
     """
     crypto_name = extract_crypto_name(user_query)
+    response_text = ""
 
-    if crypto_name and crypto_name in crypto_prices:
-        price = crypto_prices[crypto_name]["usd"]
-        response_text = f"The current price of {crypto_name.capitalize()} is **${price} USD**."
+    if crypto_name:
+        price_data = crypto_prices.get(crypto_name, {}).get("usd", None)
+        history_data = get_crypto_history(crypto_name, days=3)  # Fetch past 3 days' data
+
+        if price_data:
+            response_text += f" The current price of {crypto_name.capitalize()} is ${price_data} USD."
+        else:
+            response_text += f" Sorry, I couldn't find the latest price for {crypto_name.capitalize()}."
+
+        if history_data:
+            response_text += "\n Past 3 Days Prices:\n"
+            for date, price in history_data.items():
+                response_text += f"- {date}: ${price:.2f}\n"
+
     else:
-        response_text = "I'm sorry, I couldn't find the price for that cryptocurrency. Please try again!"
+        response_text = " Sorry, I couldn't find the price for that cryptocurrency. Please try again!"
 
-    # Generate a more human-like response using AI
+    # Check for specific queries
+    if re.search(r"should i (buy|sell)", user_query, re.IGNORECASE):
+        trade_action = "buy" if "buy" in user_query else "sell"
+        response_text += f"\n Trading Advice: Based on recent trends, I can provide insights. Would you like a technical analysis on {crypto_name.capitalize()} before making a decision?"
+    
+    elif re.search(r"(support|resistance|trend|rsi|macd)", user_query, re.IGNORECASE):
+        response_text += f"\n Technical Analysis: Would you like a breakdown of support & resistance levels for {crypto_name.capitalize()}?"
+
+    elif re.search(r"news|sentiment", user_query, re.IGNORECASE):
+        response_text += f"\n Market Sentiment: I'm working on integrating a real-time news sentiment API for {crypto_name.capitalize()}!"
+
+    # Generate a more natural AI response
     prompt = f"""
-    You are a helpful cryptocurrency assistant. When users ask about crypto prices, respond in a friendly way.
+    You are a professional cryptocurrency trading assistant. Your goal is to provide real-time and historical prices,
+    as well as offer intelligent trading insights based on technical analysis.
 
-    Example:
+    Examples:
     - User: "How much is Bitcoin today?"
-    - AI: "Bitcoin is currently trading at **$42,000 USD**. Would you like to know more details?"
+      AI: "Bitcoin is currently trading at $42,000 USD. Would you like to know its past trends?"
+    - User: "Should I buy Ethereum?"
+      AI: "Ethereum has been trending upward in the last few days. Would you like to check the latest indicators before deciding?"
 
     Now, answer this user query:
     - User: "{user_query}"
@@ -84,20 +115,20 @@ def ask_crypto_ai(user_query):
 
     full_response = openai_client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "system", "content": "You are a friendly crypto assistant providing real-time prices."},
-                  {"role": "user", "content": prompt + response_text}]
+        messages=[
+            {"role": "system", "content": "You are a friendly but professional crypto assistant providing real-time and historical prices, trading insights, and technical analysis."},
+            {"role": "user", "content": prompt + response_text}
+        ]
     )
 
     return full_response.choices[0].message.content
 
-# Example Queries
-user_queries = [
-    "Hey, what's the latest price of Ethereum?",
-    "How much is Dogecoin right now?",
-    "Is Solana doing well today?",
-    "Give me the latest update on Bitcoin!"
-]
-
-for query in user_queries:
-    print(f"\n User: {query}")
-    print(f" AI: {ask_crypto_ai(query)}")
+# Take user input dynamically
+while True:
+    user_query = input("\n Enter your crypto query (or type 'exit' to quit): ").strip()
+    
+    if user_query.lower() == "exit":
+        print(" Exiting... Have a great day!")
+        break
+    
+    print(f"\n AI: {ask_crypto_ai(user_query)}")
