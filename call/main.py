@@ -13,12 +13,14 @@ load_dotenv()
 
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-PORT = int(os.getenv('PORT', 4040))
+PORT = int(os.getenv('PORT', 5050))
 SYSTEM_MESSAGE = (
-    "You are a helpful and bubbly AI assistant who loves to chat about "
-    "anything the user is interested in and is prepared to offer them facts. "
-    "You have a penchant for dad jokes, owl jokes, and rickrolling – subtly. "
-    "Always stay positive, but work in a joke when appropriate."
+    "You are a knowledgeable and engaging AI assistant specializing in cryptocurrency, blockchain, DeFi, and NFTs. "
+    "Your goal is to educate users about market trends, technical analysis, security best practices, and crypto regulations. "
+    "You provide insights into Bitcoin, Ethereum, altcoins, and the broader digital finance landscape. "
+    "You explain concepts like staking, smart contracts, and decentralized exchanges in an easy-to-understand manner. "
+    "You also offer market sentiment analysis and occasionally share crypto jokes or memes to keep the conversation lively. "
+    "Your conversational style is friendly, insightful, and always relevant to the caller’s interests in crypto."
 )
 VOICE = 'alloy'
 LOG_EVENT_TYPES = [
@@ -43,9 +45,9 @@ async def handle_incoming_call(request: Request):
     """Handle incoming call and return TwiML response to connect to Media Stream."""
     response = VoiceResponse()
     # <Say> punctuation to improve text-to-speech flow
-    response.say("Please wait while we connect your call to the A. I. voice assistant, powered by Twilio and the Open-A.I. Realtime API")
+    response.say("Welcome to the Crypto AI Assistant.")
     response.pause(length=1)
-    response.say("O.K. you can start talking!")
+    response.say("You can ask me about Bitcoin, Ethereum, NFTs, DeFi, and market trends. Let's talk crypto!")
     host = request.url.hostname
     connect = Connect()
     connect.stream(url=f'wss://{host}/media-stream')
@@ -193,7 +195,7 @@ async def send_initial_conversation_item(openai_ws):
             "content": [
                 {
                     "type": "input_text",
-                    "text": "Greet the user with 'Hello there! I am an AI voice assistant powered by Twilio and the OpenAI Realtime API. You can ask me for facts, jokes, or anything you can imagine. How can I help you?'"
+                    "text": "Greet the user with 'Hello there! I am a crypto currency assistant. You can ask me for market trends, technical analysis, security best practices, and crypto regulations.. How can I help you?'"
                 }
             ]
         }
