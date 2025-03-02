@@ -135,12 +135,12 @@ def ask_crypto_ai(user_query):
     return full_response.choices[0].message.content
 
 # Continuous Chat
-while True:
-    print("\n Enter your crypto query (or type 'exit' to quit): ", end="", flush=True) 
-    user_query = sys.stdin.readline().strip()
+# while True:
+#     print("\n Enter your crypto query (or type 'exit' to quit): ", end="", flush=True) 
+#     user_query = sys.stdin.readline().strip()
 
-    if user_query.lower() == "exit":
-        print(" Exiting... Have a great day!")
-        break
+#     if user_query.lower() == "exit":
+#         print(" Exiting... Have a great day!")
+#         break
     
-    print(f"\n AI: {ask_crypto_ai(user_query)}")
+#     print(f"\n AI: {ask_crypto_ai(user_query)}")

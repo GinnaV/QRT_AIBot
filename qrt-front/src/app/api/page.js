@@ -8,43 +8,36 @@ import styles from "../page.module.css";
 cd qrt-front && npm run dev
 Navigate to http://localhost:3000/api
 */
+var xhr = null;
 
-// gets data from API
-async function getApi() {
-    const res = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&x_cg_demo_api_key=CG-WV56B4Cuz7isjJncGV79YQZW`);
-    if (!res.ok) {
-      throw new Error("Failed to retrieve api details");
-    }
-    return res.text(); // could also return res.json() here if we want it in the json format
-  }
+    const getXmlHttpRequestObject = function () {
+        if (!xhr) {
+            // Create a new XMLHttpRequest object 
+            xhr = new XMLHttpRequest();
+        }
+        return xhr;
+    };
 
-// posts data to API and returns response
-  async function postApi(data) {
-    const res = await fetch(`https://httpbin.org/post`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: data,
-    });
-  
-    if (!res.ok) {
-      throw new Error("Failed to update menu");
+  function sendDataCallback() {
+    // Check response is ready or not
+    if (xhr.readyState == 4 && xhr.status == 201) {
+        messageDisplay(JSON.parse(xhr.responseText).message, document.getElementById('answer'), 10);
     }
-    return res.text();
-  }
+}
 
-  // calls getAPI
-  const fetchData = async () => {
-    try {
-      const data = await getApi();
-      //const data = await postApi(document.getElementById('query').value);
-      messageDisplay(data, document.getElementById('answer'), 15);
-      return data;
-    } catch (error) {
-      setError(error.message);
-    }
-  };
+  function sendData(question) {
+    document.getElementById('query').value = "";
+
+    xhr = getXmlHttpRequestObject();
+    xhr.onreadystatechange = sendDataCallback;
+    // asynchronous requests
+    xhr.open("POST", "http://localhost:6969/users", true);
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhr.setRequestHeader('Access-Control-Allow-Headers', '*');
+    xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+    // Send the request over the network
+    xhr.send(JSON.stringify({"data": question}));
+}
 
   function messageDisplay(str, element, timeBetween) {
     var index = -1;
@@ -58,28 +51,18 @@ async function getApi() {
 
 const Page = () => {
     const router = useRouter();
-    const [formData, setFormData] = useState({ name: "" });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
   
     // form submission
     const onFinish = (event) => {
-      event.preventDefault();
-      setIsLoading(true);
 
       document.getElementById("question").style.display = "block";
       document.getElementById("answer").style.display = "block";
-      document.getElementById('question').textContent = document.getElementById('query').value;
-      document.getElementById('query').value = "";
-      fetchData()
-        .then(result => {
-          // can perform operations with the result of fetchData here
-          console.log(result);
-        })
-        .catch(() => {
-          setError("An error occurred");
-          setIsLoading(false);
-        });
+      document.getElementById("answer").innerHTML = "";
+      var question = document.getElementById('query').value;
+      document.getElementById('question').textContent = question;
+      sendData(question);
     };
   
     // cleanup effect for resetting loading state
@@ -88,30 +71,26 @@ const Page = () => {
     }, []);
 
     return (
-      <form id="form" onSubmit={onFinish} >
-        <div className={styles.main}>
+        <div id="mainDiv" className={styles.main}>
+        <a href="tel:+07700160292">Call the AI bot instead: 07700160292</a>
         <div className={styles.ctas}>
           <label htmlFor="query">Enter your query here:</label>
           <input
             required
             id="query"
             name="query"
-            value={formData.query}
-            onChange={(event) =>
-              setFormData({ ...formData, name: event.target.value })
-            }
           />
         </div>
         {error && <p className="error-message">{error}</p>}
         <div>
-          <button disabled={isLoading} className={styles.primary} type="submit">
+          <button disabled={isLoading} className={styles.primary} type="submit" onClick={onFinish}>
             Submit
           </button>
         </div>
-        </div>
         <div className={styles.question} id="question" style={{display: "none"}}></div>
         <div className={styles.answer} id="answer" style={{display: "none"}}></div>
-      </form>
+        </div>
+
     );
   };
   
