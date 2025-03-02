@@ -90,7 +90,7 @@ async def handle_incoming_call(request: Request):
     # <Say> punctuation to improve text-to-speech flow
     response.say("Welcome to the Crypto AI Assistant.")
     response.pause(length=1)
-    response.say("You can ask me about Bitcoin, Ethereum, NFTs, DeFi, and market trends. Let's talk crypto!")
+    response.say("You can ask me about Bitcoin, Ethereum, NFTs, DeFi, and market trends. How can I help you today?")
     host = request.url.hostname
     connect = Connect()
     connect.stream(url=f'wss://{host}/media-stream')
