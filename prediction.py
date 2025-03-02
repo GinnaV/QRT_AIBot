@@ -1,5 +1,6 @@
 import argparse
 import random
+import json
 import pandas as pd
 import numpy as np
 import torch
@@ -35,7 +36,7 @@ def get_train_test(dataset):
 
     scaler = MinMaxScaler(feature_range=(0, 1))
     timeseries_scaled = scaler.fit_transform(timeseries)
-    print(timeseries_scaled)
+    #print(timeseries_scaled)
 
     # train-test split for time series
     train_size = int(len(timeseries_scaled) * 0.7)
@@ -158,21 +159,32 @@ def predict_future(model, scaler, train_data, lookback, num_steps):
     predictions_original = scaler.inverse_transform(np.hstack([predictions_scaled, np.zeros((predictions_scaled.shape[0], 2))]))[:,0]
     return predictions_original
 
-def predict_prices(dataset, num_steps):
-    train, test, scaler = get_train_test(dataset)
-    # best_params = hp_search(train, test, 1)
-    # model, test_rmse, train_rmse = train_and_evaluate(best_params['hidden_size'],
-    #                                                   best_params['lr'],
-    #                                                   best_params['lookback'],
-    #                                                   best_params['num_layers'],
-    #                                                   best_params['batch_size'],
-    #                                                   train,
-    #                                                   test)
-    model, test_rmse, train_rmse = train_and_evaluate(150, 0.0005, 20, 1, 32, train, test)
-    preds = predict_future(model, scaler, train, lookback=20, num_steps=num_steps)
+def train_new(dataset, crypto_name):
+    train, test, _ = get_train_test(dataset)
+    best_params = hp_search(train, test, 10)
+    model, test_rmse, train_rmse = train_and_evaluate(best_params['hidden_size'],
+                                                      best_params['lr'],
+                                                      best_params['lookback'],
+                                                      best_params['num_layers'],
+                                                      best_params['batch_size'],
+                                                      train,
+                                                      test)
     print(f"Train RMSE: {train_rmse}\n Test RMSE: {test_rmse}")
+    # Save model
+    torch.save(model.state_dict(), f'models/{crypto_name}.pth')
+    # Save hyperparams
+    with open(f'data/{crypto_name}.json', 'w') as json_file:
+        json.dump(best_params, json_file, indent=4)
+
+    return model, best_params
+
+def predict_prices(model, crypto_name, lookback, num_steps):
+    """ Predict prices for a given number of days given a model """
+    dataset = get_crypto_data(crypto_name)
+    train, _, scaler = get_train_test(dataset)
+    preds = predict_future(model, scaler, train, lookback=20, num_steps=num_steps)
     # Returning predictions to interpretable values
-    print(f"Future predictions for the next {num_steps} days: {preds}")
+    # print(f"Future predictions for the next {num_steps} days: {preds}")
     return preds
 
 def get_crypto_data(crypto_name):
@@ -180,23 +192,49 @@ def get_crypto_data(crypto_name):
         'Bitcoin': 'data/btc-usd-max.csv',
         'Ethereum': 'data/eth-usd-max.csv',
         'Tether': 'data/usdt-usd-max.csv'
-    }
-    
+    }  
     return CRYPTO_DATASETS.get(crypto_name, None)
+
+def get_crypto_model(crypto_name):
+    CRYPTO_MODELS = {
+        'Bitcoin': 'models/Bitcoin.pth',
+        'Ethereum': 'models/Ethereum.pth',
+        'Tether': 'models/Tether.pth'
+    } 
+    path = CRYPTO_MODELS.get(crypto_name, None)
+    #print(path)
+    with open(f'data/{crypto_name}.json', 'r') as json_file:
+        best_params = json.load(json_file)
+    model = Model(best_params['hidden_size'], best_params['num_layers'])
+    model.load_state_dict(torch.load(path, weights_only=True))
+    model.eval()
+    return model, best_params
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('crypto_name', type=str, help='Name of the cryptocurrency (e.g. Bitcoin)')
     parser.add_argument('num_days', type=int, help='Number of days ahead to predict')
+    parser.add_argument('new_csv', type=str, nargs='?', default=None, help='If not None, the model will train on the given csv')
 
     args = parser.parse_args()
+
+    # Do we have new data and need to retrain our model?
+    # If so, we train and get that new model (and save it)
+    # Otherwise, we just predict from our existing model
+    if args.new_csv:
+        model, best_params = train_new(args.new_csv, args.crypto_name)
+    else:
+        model, best_params = get_crypto_model(args.crypto_name)
 
     dataset = get_crypto_data(args.crypto_name)
     if not dataset:
         return
 
-    predictions = predict_prices(dataset, args.num_days)
-    return f"These are the predicted prices for {args.crypto_name} over the next {args.num_days} days: {predictions}"
+    predictions = predict_prices(model, args.crypto_name, best_params['lookback'], args.num_days)
+    output = f"These are the predicted prices for {args.crypto_name} over the next {args.num_days} days: {predictions}"
+    print(output)
+    return output
 
 if __name__ == "__main__":
     main()
