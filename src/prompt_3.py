@@ -74,6 +74,16 @@ def ask_crypto_ai(user_query):
 
     # Extract cryptocurrency name
     crypto_name = extract_crypto_name(user_query)
+    crypto_prices = get_crypto_prices()
+    crypto_ids = [
+    "bitcoin", "ethereum", "dogecoin", "ripple", "cardano", "solana", "polkadot",
+    "litecoin", "chainlink", "stellar", "monero", "tron", "avalanche-2", "uniswap", "algorand"
+    ]
+
+    crypto_names_map = {name: name for name in crypto_ids}  # Direct mapping
+
+    # Dictionary to store chat memory (user's selected crypto)
+    chat_memory = {"selected_crypto": None, "history": []}
 
     # If user mentions a new crypto, update memory
     if crypto_name:
