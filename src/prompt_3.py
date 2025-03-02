@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import re
 import datetime
+import sys
 
 # Load API Key
 load_dotenv()
@@ -16,6 +17,9 @@ crypto_ids = [
 ]
 
 crypto_names_map = {name: name for name in crypto_ids}  # Direct mapping
+
+# Dictionary to store chat memory (user's selected crypto)
+chat_memory = {"selected_crypto": None, "history": []}
 
 def get_crypto_prices():
     """Fetches real-time prices for predefined crypto IDs."""
@@ -40,7 +44,7 @@ def get_crypto_history(crypto_id, days=3):
         response.raise_for_status()
         data = response.json()
         
-        # Convert timestamps to readable dates with timezone awareness
+        # Convert timestamps to readable dates
         history = {
             datetime.datetime.fromtimestamp(item[0] / 1000, tz=datetime.timezone.utc).strftime('%Y-%m-%d'): item[1]
             for item in data["prices"]
@@ -64,69 +68,77 @@ def extract_crypto_name(query):
 
 def ask_crypto_ai(user_query):
     """
-    Processes human-like crypto queries and returns a response with real-time or historical prices.
+    Handles user queries with memory of past conversations.
     """
+    global chat_memory
+
+    # Extract cryptocurrency name
     crypto_name = extract_crypto_name(user_query)
-    response_text = ""
 
+    # If user mentions a new crypto, update memory
     if crypto_name:
-        price_data = crypto_prices.get(crypto_name, {}).get("usd", None)
-        history_data = get_crypto_history(crypto_name, days=3)  # Fetch past 3 days' data
-
-        if price_data:
-            response_text += f" The current price of {crypto_name.capitalize()} is ${price_data} USD."
-        else:
-            response_text += f" Sorry, I couldn't find the latest price for {crypto_name.capitalize()}."
-
-        if history_data:
-            response_text += "\n Past 3 Days Prices:\n"
-            for date, price in history_data.items():
-                response_text += f"- {date}: ${price:.2f}\n"
-
+        chat_memory["selected_crypto"] = crypto_name
     else:
-        response_text = " Sorry, I couldn't find the price for that cryptocurrency. Please try again!"
+        # If user doesn't mention one, use the last selected crypto
+        crypto_name = chat_memory["selected_crypto"]
 
-    # Check for specific queries
+    if not crypto_name:
+        return " Please specify a cryptocurrency to continue (e.g., 'Tell me about Bitcoin')."
+
+    response_text = f"Talking about {crypto_name.capitalize()}:\n"
+
+    # Fetch price and historical data
+    price_data = crypto_prices.get(crypto_name, {}).get("usd", None)
+    history_data = get_crypto_history(crypto_name, days=3)
+
+    if price_data:
+        response_text += f" The current price of {crypto_name.capitalize()} is *${price_data} USD*."
+    else:
+        response_text += f" Sorry, I couldn't find the latest price for {crypto_name.capitalize()}."
+
+    if history_data:
+        response_text += "\n *Past 3 Days Prices:*\n"
+        for date, price in history_data.items():
+            response_text += f"- {date}: *${price:.2f}*\n"
+
+    # Check for trading advice, technical analysis, or sentiment analysis
     if re.search(r"should i (buy|sell)", user_query, re.IGNORECASE):
-        trade_action = "buy" if "buy" in user_query else "sell"
-        response_text += f"\n Trading Advice: Based on recent trends, I can provide insights. Would you like a technical analysis on {crypto_name.capitalize()} before making a decision?"
-    
+        response_text += f"\n *Trading Advice:* Want me to analyze trends for {crypto_name.capitalize()} before deciding?"
+
     elif re.search(r"(support|resistance|trend|rsi|macd)", user_query, re.IGNORECASE):
-        response_text += f"\n Technical Analysis: Would you like a breakdown of support & resistance levels for {crypto_name.capitalize()}?"
+        response_text += f"\n *Technical Analysis:* Would you like a breakdown of support & resistance levels for {crypto_name.capitalize()}?"
 
     elif re.search(r"news|sentiment", user_query, re.IGNORECASE):
-        response_text += f"\n Market Sentiment: I'm working on integrating a real-time news sentiment API for {crypto_name.capitalize()}!"
+        response_text += f"\n *Market Sentiment:* I'm working on integrating a real-time news sentiment API for {crypto_name.capitalize()}!"
 
-    # Generate a more natural AI response
+    # Add the current query to chat memory
+    chat_memory["history"].append({"role": "user", "content": user_query})
+    chat_memory["history"].append({"role": "assistant", "content": response_text})
+
+    # Generate AI response with context
     prompt = f"""
-    You are a professional cryptocurrency trading assistant. Your goal is to provide real-time and historical prices,
-    as well as offer intelligent trading insights based on technical analysis.
-
-    Examples:
-    - User: "How much is Bitcoin today?"
-      AI: "Bitcoin is currently trading at $42,000 USD. Would you like to know its past trends?"
-    - User: "Should I buy Ethereum?"
-      AI: "Ethereum has been trending upward in the last few days. Would you like to check the latest indicators before deciding?"
-
-    Now, answer this user query:
-    - User: "{user_query}"
-    - AI:
+    You are a cryptocurrency trading assistant.
+    You remember the user's chosen cryptocurrency and keep conversation context.
+    The current selected cryptocurrency is {crypto_name.capitalize()}.
+    
+    User Query: "{user_query}"
+    AI Response:
     """
 
     full_response = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a friendly but professional crypto assistant providing real-time and historical prices, trading insights, and technical analysis."},
-            {"role": "user", "content": prompt + response_text}
-        ]
+            {"role": "system", "content": "You are a crypto assistant who remembers past conversations and keeps track of the selected cryptocurrency."}
+        ] + chat_memory["history"]
     )
 
     return full_response.choices[0].message.content
 
-# Take user input dynamically
+# Continuous Chat
 while True:
-    user_query = input("\n Enter your crypto query (or type 'exit' to quit): ").strip()
-    
+    print("\n Enter your crypto query (or type 'exit' to quit): ", end="", flush=True) 
+    user_query = sys.stdin.readline().strip()
+
     if user_query.lower() == "exit":
         print(" Exiting... Have a great day!")
         break
