@@ -8,6 +8,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
 from dotenv import load_dotenv
+import requests
+import datetime
 
 load_dotenv()
 
@@ -21,6 +23,8 @@ SYSTEM_MESSAGE = (
     "You explain concepts like staking, smart contracts, and decentralized exchanges in an easy-to-understand manner. "
     "You also offer market sentiment analysis and occasionally share crypto jokes or memes to keep the conversation lively. "
     "Your conversational style is friendly, insightful, and always relevant to the caller’s interests in crypto."
+    " You can also fetch real-time cryptocurrency prices and past trends. "
+    "If a user asks about Bitcoin, Ethereum, or any major crypto, provide the latest price and a summary of past trends."
 )
 VOICE = 'alloy'
 LOG_EVENT_TYPES = [
@@ -35,6 +39,45 @@ app = FastAPI()
 
 if not OPENAI_API_KEY:
     raise ValueError('Missing the OpenAI API key. Please set it in the .env file.')
+CRYPTO_IDS = [
+    "bitcoin", "ethereum", "dogecoin", "ripple", "cardano", "solana", "polkadot",
+    "litecoin", "chainlink", "stellar", "monero", "tron", "avalanche-2", "uniswap", "algorand"
+]
+crypto_names_map = {name: name for name in CRYPTO_IDS}
+crypto_prices = {}
+
+
+def get_crypto_prices():
+    """Fetches real-time prices for predefined crypto IDs."""
+    ids_string = ",".join(CRYPTO_IDS)
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids_string}&vs_currencies=usd"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print("Error fetching prices:", e)
+        return {}
+
+crypto_prices = get_crypto_prices()
+
+
+def get_crypto_history(crypto_id, days=3):
+    """Fetches historical prices for a given cryptocurrency."""
+    url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart?vs_currency=usd&days={days}&interval=daily"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return {
+            datetime.datetime.fromtimestamp(item[0] / 1000, tz=datetime.timezone.utc).strftime('%Y-%m-%d'): item[1]
+            for item in data["prices"]
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching historical data for {crypto_id}: {e}")
+        return {}
+
+
 
 @app.get("/", response_class=JSONResponse)
 async def index_page():

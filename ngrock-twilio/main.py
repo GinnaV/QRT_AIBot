@@ -1,7 +1,9 @@
+import datetime
 import os
 import json
 import base64
 import asyncio
+import requests
 import websockets
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -19,6 +21,8 @@ SYSTEM_MESSAGE = (
     "anything the user is interested in and is prepared to offer them facts. "
     "You have a penchant for dad jokes, owl jokes, and rickrolling – subtly. "
     "Always stay positive, but work in a joke when appropriate."
+    " You can also fetch real-time cryptocurrency prices and past trends. "
+    "If a user asks about Bitcoin, Ethereum, or any major crypto, provide the latest price and a summary of past trends."
 )
 VOICE = 'alloy'
 LOG_EVENT_TYPES = [
@@ -33,6 +37,45 @@ app = FastAPI()
 
 if not OPENAI_API_KEY:
     raise ValueError('Missing the OpenAI API key. Please set it in the .env file.')
+
+CRYPTO_IDS = [
+    "bitcoin", "ethereum", "dogecoin", "ripple", "cardano", "solana", "polkadot",
+    "litecoin", "chainlink", "stellar", "monero", "tron", "avalanche-2", "uniswap", "algorand"
+]
+crypto_names_map = {name: name for name in CRYPTO_IDS}
+crypto_prices = {}
+
+
+def get_crypto_prices():
+    """Fetches real-time prices for predefined crypto IDs."""
+    ids_string = ",".join(CRYPTO_IDS)
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids_string}&vs_currencies=usd"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print("Error fetching prices:", e)
+        return {}
+
+crypto_prices = get_crypto_prices()
+
+
+def get_crypto_history(crypto_id, days=3):
+    """Fetches historical prices for a given cryptocurrency."""
+    url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart?vs_currency=usd&days={days}&interval=daily"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return {
+            datetime.datetime.fromtimestamp(item[0] / 1000, tz=datetime.timezone.utc).strftime('%Y-%m-%d'): item[1]
+            for item in data["prices"]
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching historical data for {crypto_id}: {e}")
+        return {}
+
 
 @app.get("/", response_class=JSONResponse)
 async def index_page():
@@ -102,44 +145,46 @@ async def handle_media_stream(websocket: WebSocket):
                     await openai_ws.close()
 
         async def send_to_twilio():
-            """Receive events from the OpenAI Realtime API, send audio back to Twilio."""
-            nonlocal stream_sid, last_assistant_item, response_start_timestamp_twilio
-            try:
-                async for openai_message in openai_ws:
-                    response = json.loads(openai_message)
-                    if response['type'] in LOG_EVENT_TYPES:
-                        print(f"Received event: {response['type']}", response)
+            """Receive events from OpenAI and send audio back to Twilio."""
+    try:
+        async for openai_message in openai_ws:
+            response = json.loads(openai_message)
+            if response['type'] in LOG_EVENT_TYPES:
+                print(f"Received event: {response['type']}", response)
 
-                    if response.get('type') == 'response.audio.delta' and 'delta' in response:
-                        audio_payload = base64.b64encode(base64.b64decode(response['delta'])).decode('utf-8')
-                        audio_delta = {
-                            "event": "media",
-                            "streamSid": stream_sid,
-                            "media": {
-                                "payload": audio_payload
-                            }
-                        }
-                        await websocket.send_json(audio_delta)
+            # Inject Crypto Data if Mentioned
+            user_text = response.get('content', '')  # Extract user text if available
+            crypto_name = extract_crypto_name(user_text)
 
-                        if response_start_timestamp_twilio is None:
-                            response_start_timestamp_twilio = latest_media_timestamp
-                            if SHOW_TIMING_MATH:
-                                print(f"Setting start timestamp for new response: {response_start_timestamp_twilio}ms")
+            if crypto_name:
+                crypto_price = crypto_prices.get(crypto_name, {}).get("usd", "Unknown")
+                history_data = get_crypto_history(crypto_name, days=3)
 
-                        # Update last_assistant_item safely
-                        if response.get('item_id'):
-                            last_assistant_item = response['item_id']
+                crypto_response = f"The current price of {crypto_name.capitalize()} is ${crypto_price} USD."
+                if history_data:
+                    crypto_response += " Here is the last 3 days of price history:\n"
+                    for date, price in history_data.items():
+                        crypto_response += f"- {date}: ${price:.2f}\n"
 
-                        await send_mark(websocket, stream_sid)
+                # Send crypto data as an assistant response
+                crypto_event = {
+                    "type": "response.audio.delta",
+                    "delta": base64.b64encode(crypto_response.encode()).decode("utf-8"),
+                }
+                await websocket.send_json(crypto_event)
 
-                    # Trigger an interruption. Your use case might work better using `input_audio_buffer.speech_stopped`, or combining the two.
-                    if response.get('type') == 'input_audio_buffer.speech_started':
-                        print("Speech started detected.")
-                        if last_assistant_item:
-                            print(f"Interrupting response with id: {last_assistant_item}")
-                            await handle_speech_started_event()
-            except Exception as e:
-                print(f"Error in send_to_twilio: {e}")
+    except Exception as e:
+        print(f"Error in send_to_twilio: {e}")
+
+        def extract_crypto_name(query):
+            """Extracts cryptocurrency name from the user query."""
+            query = query.lower()
+            for name in crypto_names_map.keys():
+                    if name in query:
+                        return name
+        return None
+
+
 
         async def handle_speech_started_event():
             """Handle interruption when the caller's speech starts."""
