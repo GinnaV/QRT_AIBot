@@ -1,0 +1,7 @@
+{
+    "hidden_size": 150,
+    "lr": 0.0005,
+    "lookback": 20,
+    "num_layers": 1,
+    "batch_size": 32
+}
